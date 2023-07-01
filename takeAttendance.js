@@ -1,10 +1,12 @@
+const TEST_ATTENDANCE_SHEET_NAME = 'TEST_MARK_ATTENDANCE'
+
 function getAttendanceForDate() {
   const d = new Date()
   const currDay = d.getDay()
   const today = d.toString()
   const todaySplit = today.split(" ")
   const todayStr = todaySplit[0] + " " + todaySplit[1] + " " + todaySplit[2] + " " + todaySplit[3]
-  // const todayStr = "Sun Mar 19 2023"
+  // const todayStr = "Sun June 25 2023"
   // console.info("Today's date:", todayStr)
 
   /* ** We only want attendance updated on Sunday's ** */
@@ -27,38 +29,44 @@ function getAttendanceForDate() {
   let attendanceRange = attendanceSheet.getRange(monthSheetName + "!" + FIRST_SUNDAY + "1:" + LAST_SUNDAY + "1") // Get only the range of sundays listed in the sheet
 
   let columnIndex = 0 // We use this to find the column letter to use when updating the cells.
-  let isToday = false
-  attendanceRange.getValues()[0].every(v => { // Use .every() so we can break out when needed
-    let vStr = String(v)
-    // console.info('is today?', vStr)
-    if (vStr.includes(todayStr)) {
-      isToday = true
-      // console.info('found today')
-      // console.info('columnIndex:', columnIndex)
-      return false // Break out of the loop
+  let rangeValues = attendanceRange.getValues()[0]
+  let rangeOfSundays = rangeValues.filter((date) => { // O(n)
+    // Skip any empty dates
+    if (date === '' || date === undefined) {
+      return false
     }
     
-    columnIndex += 1
-    return true // Keep the loop going
+    let dateToFilter = new Date(todayStr)
+
+    if (date.getTime() === dateToFilter.getTime()) {
+      return true
+    } else {
+      columnIndex += 1
+    }
   })
 
+  let sundayDate = rangeOfSundays[0] // There'll only be one result
+  // console.info('sundayDate:', sundayDate)
+
   /* ** End if today's date wasn't found in the sheet ** */
-  if (!isToday) {
-    console.info('no cooresponding date was found')
+  if (sundayDate === '' || sundayDate === undefined) {
+    console.info("Date wasn't found")
     return
   }
+
+  // console.info("this is running on sunday")
 
   const responseSheet = SpreadsheetApp.setActiveSheet(ss.getSheetByName(QR_CODE_SHEET_NAME)) // Get a specific sheet
   var attendeesForToday = getAttendeesFromFormSubmission(responseSheet, todayStr) // Get all the names of the attendees for today
 
-  console.info('how many attended:', attendeesForToday.length)
+  // console.info('how many attended:', attendeesForToday.length)
   // console.info('who attended', todayStr, '?\n', attendeesForToday)
 
   // Put all the attendees into the corresponding month sheet
   let columnLetter = COLUMN_LETTER[columnIndex]
   let namesEndRange = TOP_NAMES_ROW + (attendeesForToday.length - 1) // Row 3 plus how many attendees today
   let rangeToSet = columnLetter + TOP_NAMES_ROW + ":" + columnLetter + namesEndRange
-  console.info('range to update:', rangeToSet)
+  // console.info('range to update:', rangeToSet)
 
   attendanceRange = attendanceSheet.getRange(rangeToSet) // set range to update under the corresponding sunday
   attendanceRange.setValues(attendeesForToday) // Update the new values
@@ -67,19 +75,40 @@ function getAttendanceForDate() {
 
 // Return a list of all the attendees for the current date.
 function getAttendeesFromFormSubmission(responseSheet, todayStr) {
+  let index = 2 // Since names start at row 2
   let responseIndexForName = [] // Store all the indecies where there's a value that matches the date
-  let responseDate = responseSheet.getRange(QR_CODE_SHEET_NAME + '!A1:A')
-  
-  responseDate.getValues().forEach((v, index) => {
-    let vStr = String(v) // convert the object to a string
+  let responseDate = responseSheet.getRange(QR_CODE_SHEET_NAME + "!A2:A") // All Sunday dates are in column A
 
-    if (vStr.includes(todayStr)) { // check if the string contains the date being looked at
-      responseIndexForName.push(index += 1) // Add 1 to coorespond with the sheet row index
+  responseDate.getValues().filter((fullDate) => {
+    // We don't want the time
+    let dateComponents = String(fullDate).split(" ")
+    let day = dateComponents[0]
+    let month = dateComponents[1]
+    let date = dateComponents[2]
+    let year = dateComponents[3]
+    let dateString = `${day} ${month} ${date} ${year}`
+
+    let dateToFilter = new Date(todayStr)
+    let valueDate = new Date(dateString)
+
+    if (isNaN(valueDate.getTime())) {
+      return false
+    } 
+
+    // console.info('date:', dateString, valueDate.getTime())
+    // console.info('todayStr:', todayStr, dateToFilter.getTime())
+    // console.info()
+
+    if (valueDate.getTime() === dateToFilter.getTime()) {
+      responseIndexForName.push(index)
     }
+
+    index += 1
   })
   
   // console.info('which indexes contain', todayStr, '?', responseIndexForName)
 
+  
   // Get the start and end ranges that we want to scan through
   let startRange = responseIndexForName[0]
   let endRange = responseIndexForName[responseIndexForName.length - 1]
@@ -92,60 +121,32 @@ function getAttendeesFromFormSubmission(responseSheet, todayStr) {
   }
 
   let attendeesForToday = []
-  let responseFirstNames = responseSheet.getRange(QR_CODE_SHEET_NAME + SUNDAY1_START + startRange + SUNDAY1_END + endRange)
-  let responseLastNames = responseSheet.getRange(QR_CODE_SHEET_NAME + SUNDAY2_START + startRange + SUNDAY2_END + endRange)
-  let responseIsVisiting = responseSheet.getRange(QR_CODE_SHEET_NAME + SUNDAY3_START + startRange + SUNDAY3_END + endRange)
-  let responseAttendanceType = responseSheet.getRange(QR_CODE_SHEET_NAME + SUNDAY4_START + startRange + SUNDAY4_END + endRange)
-  let responseOrganization = responseSheet.getRange(QR_CODE_SHEET_NAME + SUNDAY5_START + startRange + SUNDAY5_END + endRange)
+  let rangeString = `${SUNDAY1_START}${startRange}${SUNDAY4_END}${endRange}`
+  let repsonseInfo = responseSheet.getRange(QR_CODE_SHEET_NAME + rangeString)
 
+  repsonseInfo.getValues().forEach((row, index) => {
+    let firstName = row[INDEX_COL_A]
+    let lastName = row[INDEX_COL_B]
+    let visitor = row[INDEX_COL_C]
+    let organization = row[INDEX_COL_D]
 
-  // Get the first and last names of the attendees, along if they're in EQ, RS, a visitor, and/or on zoom
-  responseFirstNames.getValues().forEach((v, index) => {
-    let firstName = String(v) // convert the object to a string
-    let lastName = String(responseLastNames.getValues()[index]) // convert the object to a string
-    let fullName = lastName + ', ' + firstName
-
-    // Find out which organization the attendee belongs to
-    let organization = responseOrganization.getValues()[index]
-    if (organization == EQ) {
-      fullName += " (E)"
-    }
-    
-    if (organization == RS) {
-      fullName += " (R)"
+    let entry = `${lastName}, ${firstName}`
+    if (organization === EQ) {
+      entry += " (E)"
+    } else if (organization === RS) {
+      entry += " (R)"
     }
 
     // If attendee is visiting, put a V
-    let isVisiting = responseIsVisiting.getValues()[index]
-    if (isVisiting == "Yes") {
-      fullName += " (V)"
+    if (visitor == "Yes") {
+      entry += " (V)"
     }
 
-    // If attendee is on zoom, put a Z
-    let attendanceType = responseAttendanceType.getValues()[index]
-    if (attendanceType == "Zoom") {
-      fullName += " (Z)"
-    }
-
-    attendeesForToday.push([fullName]) // To update rows in a single column, add a new array into the array.
+    attendeesForToday.push([entry]) // To update rows in a single column, add a new array into the array.
   })
 
   return attendeesForToday
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
