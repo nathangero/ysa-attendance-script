@@ -59,6 +59,12 @@ function getAttendanceForDate() {
   const responseSheet = SpreadsheetApp.setActiveSheet(ss.getSheetByName(QR_CODE_SHEET_NAME)) // Get a specific sheet
   var attendeesForToday = getAttendeesFromFormSubmission(responseSheet, todayStr) // Get all the names of the attendees for today
 
+  // Check if no attendance was taken
+  if (!attendeesForToday) {
+    console.info("Attendance wasn't taken on", todayStr)
+    return
+  }
+
   // console.info('how many attended:', attendeesForToday.length)
   // console.info('who attended', todayStr, '?\n', attendeesForToday)
 
