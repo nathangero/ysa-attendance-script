@@ -4,7 +4,7 @@ function markAttendance() {
   const today = d.toString()
   const todaySplit = today.split(" ")
   const todayStr = todaySplit[0] + " " + todaySplit[1] + " " + todaySplit[2] + " " + todaySplit[3]
-  // const todayStr = "Sun Mar 19 2023"
+  // const todayStr = "Sun Jun 25 2023"
   // console.info("Today's date:", todayStr)
 
   /* ** We only want attendance updated on Sunday's ** */
@@ -14,87 +14,96 @@ function markAttendance() {
   }
 
 
-  let monthIndex = d.getMonth() // Used to get the correct month from the MONTHS array to access the proper google sheet
   let currentYear = d.getFullYear() // Used to get the year that this function runs in to access the proper google sheet
 
-  let monthSheetName = MONTHS[monthIndex] + " " + currentYear
-  // console.info('monthSheetName:', monthSheetName)
+  let attendanceSheetName = ATTENDANCE_SHEET_NAME + " " + currentYear
+  // console.info('attendanceSheetName:', attendanceSheetName)
 
   const ss = SpreadsheetApp.getActiveSpreadsheet()
-  const attendanceSheet = SpreadsheetApp.setActiveSheet(ss.getSheetByName(monthSheetName)) // Get the month sheet
-  const FIRST_SUNDAY = COLUMN_LETTER[0] // Get the first letter that will have the first sunday date
-  const LAST_SUNDAY = COLUMN_LETTER[COLUMN_LETTER.length - 1] // Get the last letter that will have the last sunday date
-  let attendanceRange = attendanceSheet.getRange(monthSheetName + "!" + FIRST_SUNDAY + "1:" + LAST_SUNDAY + "1") // Get only the range of sundays listed in the sheet
+  const attendanceSheet = SpreadsheetApp.setActiveSheet(ss.getSheetByName(attendanceSheetName))
+  let targetSunday = new Date(todayStr)
+  console.info('looking for:', targetSunday)
 
-  /*
-    TODO:
-    - Get all the attendee names for today
-    - In the big Attendance sheet, need to find the row of the name,
-      - if name doesn't exist, add a new row for them
-      - else, mark under the date they attended
-    - sort column A from A->Z
-  */
-}
+  var range = attendanceSheet.getRange("B1:1"); // Assuming the column headers start from A1
+  var headers = range.getValues()[0];
+  
+  let foundColumns = headers
+    .map(function (header, index) {
+      return { header: header, column: index + 2 };
+    })
+    .filter(function (column) {
+      return column.header instanceof Date && column.header.toDateString() === targetSunday.toDateString();
+    });
 
-
-// Return a list of all the attendees for the current date.
-function getAttendeesNames(responseSheet, todayStr) {
-let index = 2 // Since names start at row 2
-let responseIndexForName = [] // Store all the indecies where there's a value that matches the date
-let responseDate = responseSheet.getRange(QR_CODE_SHEET_NAME + "!A2:A") // All Sunday dates are in column A
-
-responseDate.getValues().filter((fullDate) => {
-  // We don't want the time
-  let dateComponents = String(fullDate).split(" ")
-  let day = dateComponents[0]
-  let month = dateComponents[1]
-  let date = dateComponents[2]
-  let year = dateComponents[3]
-  let dateString = `${day} ${month} ${date} ${year}`
-
-  let dateToFilter = new Date(todayStr)
-  let valueDate = new Date(dateString)
-
-  if (isNaN(valueDate.getTime())) {
-    return false
-  } 
-
-  // console.info('date:', dateString, valueDate.getTime())
-  // console.info('todayStr:', todayStr, dateToFilter.getTime())
-  // console.info()
-
-  if (valueDate.getTime() === dateToFilter.getTime()) {
-    responseIndexForName.push(index)
+  if (foundColumns[0].length <= 0) {
+    console.info("Today isn't a Sunday")
+    return
   }
 
-  index += 1
-})
+  let foundSunday = foundColumns[0].header
+  var foundSundayColumn = foundColumns[0].column;
+  var sundayColumnLetter = getColumnLetter(foundSundayColumn);
+  console.info('foundSunday:', foundSunday)
+  console.info('sundayColumnLetter:', sundayColumnLetter)
 
-// console.info('which indexes contain', todayStr, '?', responseIndexForName)
+  
+  const responseSheet = SpreadsheetApp.setActiveSheet(ss.getSheetByName(QR_CODE_SHEET_NAME)) // Get a specific sheet
+  var attendeesForToday = getAttendeesNames(responseSheet, todayStr) // Get all the names of the attendees for today
+  // console.info("attendeesForToday:\n", attendeesForToday)
 
+  for (var i = 0; i < attendeesForToday.length; i++) {
+    var targetName = attendeesForToday[i].join(', ')
 
-// Get the start and end ranges that we want to scan through
-let startRange = responseIndexForName[0]
-let endRange = responseIndexForName[responseIndexForName.length - 1]
+    var range = attendanceSheet.getRange("A2:A"); // Search in column A of the attendance sheet
+    var values = range.getValues().flat();
 
-/* Make a check against non existant dates */
-if (startRange == undefined && endRange == undefined) { 
-  console.log('today was not found in attendance sheet')
-  console.log('todays date:', todayStr)
-  return
+    var nameRowIndex = values.findIndex((name) => {
+      return name.toLowerCase() === targetName.toLowerCase();
+    });
+
+    if (nameRowIndex !== -1) {
+      // Name found
+      let rowNumber = nameRowIndex + 2; // Add 2 because names start on row 2
+      // console.info('targetName:', targetName, "is here at row:", rowNumber)
+
+      var cell = attendanceSheet.getRange(rowNumber, foundSundayColumn);
+      cell.setBackgroundRGB(204, 255, 204);
+    } else {
+      // Name not found, create new row
+      let lastRow = attendanceSheet.getLastRow();
+      let newRow = lastRow + 1;
+      let formattedName = formatName(targetName);
+
+      attendanceSheet.getRange(newRow, 1).setValue(formattedName);
+      attendanceSheet.getRange(newRow, foundSundayColumn).setBackgroundRGB(204, 255, 204); // Light green color
+    }
+  }
+  
+  // Sort by ascending order from A to Z
+  let lastColumn = getColumnLetter(attendanceSheet.getLastColumn())
+  let lastRow = attendanceSheet.getLastRow()
+
+  var columnARange = attendanceSheet.getRange(`A2:${lastColumn}` + lastRow);
+  columnARange.sort({ column: 1, ascending: true });
 }
 
-let attendeesForToday = []
-let rangeString = `${SUNDAY1_START}${startRange}${SUNDAY2_END}${endRange}` // Only gets first and last names
-let repsonseInfo = responseSheet.getRange(QR_CODE_SHEET_NAME + rangeString)
+function getColumnLetter(column) {
+  var temp, letter = '';
+  while (column > 0) {
+    temp = (column - 1) % 26;
+    letter = String.fromCharCode(temp + 65) + letter;
+    column = (column - temp - 1) / 26;
+  }
+  return letter;
+}
 
-repsonseInfo.getValues().forEach((row, index) => {
-  let firstName = row[INDEX_COL_A]
-  let lastName = row[INDEX_COL_B]
-  let entry = `${lastName}, ${firstName}`
 
-  attendeesForToday.push([entry]) // To update rows in a single column, add a new array into the array.
-})
+function formatName(name) {
+  var lowercasedName = name.toLowerCase();
+  var nameParts = lowercasedName.split(", ");
+  var firstName = nameParts[1].charAt(0).toUpperCase() + nameParts[1].slice(1);
+  var lastName = nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1);
 
-return attendeesForToday
+
+  return `${lastName}, ${firstName}`;
 }
