@@ -1,8 +1,10 @@
 const QR_CODE_SHEET_NAME = 'qr_code_response'
+const ATTENDANCE_SHEET_NAME = 'Attendance'
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const COLUMN_LETTER = ['B', 'C', 'D', 'E', 'F'] // These are the columns in the sheet that the dates will be under
 const LETTER_TO_COLUMN_NUM = {'B':2, 'C':3, 'D':4, 'E':5, 'F':6} // Used for when sorting the column
 const TOP_NAMES_ROW = 7 // The first row where the names will be inputed in the selected column
+const TOP_NAMES_ROW_FULL_ATTENDANCE = 2 // First row where names start
 const FONT_SIZE = 11
 const FONT_FAMILY = "Arial"
 const SUNDAY = 0 // We only want Sunday which is 0 in Date.getDay()
