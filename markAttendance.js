@@ -4,7 +4,7 @@ function markAttendance() {
   const today = d.toString()
   const todaySplit = today.split(" ")
   const todayStr = todaySplit[0] + " " + todaySplit[1] + " " + todaySplit[2] + " " + todaySplit[3]
-  // const todayStr = "Sun Jun 25 2023"
+  // const todayStr = "Sun Apr 30 2023"
   // console.info("Today's date:", todayStr)
 
   /* ** We only want attendance updated on Sunday's ** */
@@ -50,6 +50,12 @@ function markAttendance() {
   const responseSheet = SpreadsheetApp.setActiveSheet(ss.getSheetByName(QR_CODE_SHEET_NAME)) // Get a specific sheet
   var attendeesForToday = getAttendeesNames(responseSheet, todayStr) // Get all the names of the attendees for today
   // console.info("attendeesForToday:\n", attendeesForToday)
+
+  // Check if attendance was taken
+  if (!attendeesForToday) {
+    console.info("Attendance wasn't taken on", todayStr)
+    return
+  }
 
   for (var i = 0; i < attendeesForToday.length; i++) {
     var targetName = attendeesForToday[i].join(', ')
