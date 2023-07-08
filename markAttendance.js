@@ -51,7 +51,7 @@ function markAttendance() {
   var attendeesForToday = getAttendeesNames(responseSheet, todayStr) // Get all the names of the attendees for today
   // console.info("attendeesForToday:\n", attendeesForToday)
 
-  // Check if attendance was taken
+  // Check if no attendance was taken
   if (!attendeesForToday) {
     console.info("Attendance wasn't taken on", todayStr)
     return
