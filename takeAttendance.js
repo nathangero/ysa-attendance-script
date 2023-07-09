@@ -1,12 +1,12 @@
 const TEST_ATTENDANCE_SHEET_NAME = 'TEST_MARK_ATTENDANCE'
 
-function getAttendanceForDate() {
+function takeAttendance() {
   const d = new Date()
   const currDay = d.getDay()
   const today = d.toString()
   const todaySplit = today.split(" ")
   const todayStr = todaySplit[0] + " " + todaySplit[1] + " " + todaySplit[2] + " " + todaySplit[3]
-  // const todayStr = "Sun June 25 2023"
+  // const todayStr = "Sun Jul 02 2023"
   // console.info("Today's date:", todayStr)
 
   /* ** We only want attendance updated on Sunday's ** */
@@ -26,27 +26,32 @@ function getAttendanceForDate() {
   const attendanceSheet = SpreadsheetApp.setActiveSheet(ss.getSheetByName(monthSheetName)) // Get the month sheet
   const FIRST_SUNDAY = COLUMN_LETTER[0] // Get the first letter that will have the first sunday date
   const LAST_SUNDAY = COLUMN_LETTER[COLUMN_LETTER.length - 1] // Get the last letter that will have the last sunday date
+  let targetSunday = new Date(todayStr)
+
   let attendanceRange = attendanceSheet.getRange(monthSheetName + "!" + FIRST_SUNDAY + "1:" + LAST_SUNDAY + "1") // Get only the range of sundays listed in the sheet
 
-  let columnIndex = 0 // We use this to find the column letter to use when updating the cells.
-  let rangeValues = attendanceRange.getValues()[0]
-  let rangeOfSundays = rangeValues.filter((date) => { // O(n)
-    // Skip any empty dates
-    if (date === '' || date === undefined) {
-      return false
-    }
-    
-    let dateToFilter = new Date(todayStr)
+  var headers = attendanceRange.getValues()[0];
+  
+  let foundColumns = headers
+    .map(function (header, index) {
+      return { header: header, column: index };
+    })
+    .filter(function (column) {
+      return column.header instanceof Date && column.header.toDateString() === targetSunday.toDateString();
+    });
 
-    if (date.getTime() === dateToFilter.getTime()) {
-      return true
-    } else {
-      columnIndex += 1
-    }
-  })
+  if (foundColumns[0].length <= 0) {
+    console.info("Today isn't a Sunday")
+    return
+  }
 
-  let sundayDate = rangeOfSundays[0] // There'll only be one result
-  // console.info('sundayDate:', sundayDate)
+  let sundayDate = foundColumns[0] // There'll only be one result
+  let foundSunday = foundColumns[0].header
+  var foundSundayColumn = foundColumns[0].column;
+  var sundayColumnLetter = getColumnLetter(foundSundayColumn);
+  console.info('foundSunday:', foundSunday)
+  console.info('sundayColumnLetter:', sundayColumnLetter)
+
 
   /* ** End if today's date wasn't found in the sheet ** */
   if (sundayDate === '' || sundayDate === undefined) {
@@ -69,10 +74,10 @@ function getAttendanceForDate() {
   // console.info('who attended', todayStr, '?\n', attendeesForToday)
 
   // Put all the attendees into the corresponding month sheet
-  let columnLetter = COLUMN_LETTER[columnIndex]
+  let columnLetter = COLUMN_LETTER[foundSundayColumn]
   let namesEndRange = TOP_NAMES_ROW + (attendeesForToday.length - 1) // Row 3 plus how many attendees today
   let rangeToSet = columnLetter + TOP_NAMES_ROW + ":" + columnLetter + namesEndRange
-  // console.info('range to update:', rangeToSet)
+  console.info('range to update:', rangeToSet)
 
   attendanceRange = attendanceSheet.getRange(rangeToSet) // set range to update under the corresponding sunday
   attendanceRange.setValues(attendeesForToday) // Update the new values
